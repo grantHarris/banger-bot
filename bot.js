@@ -83,11 +83,13 @@ client.on('ready', () => {
 
 client.on('message', async message => {
 
-    console.log(`Got message: ${message.body}`);
+    console.log(message);
+    console.log(`${message.notifyName}: ${message.body}`);
 
-    if (message.isGroupMsg) {
-        console.log(`Message from Group: ${message.chat.name}`);
-        console.log(`Group ID: ${message.chat.id}`);
+    const chat = await message.getChat();
+    if (chat.isGroupMsg) {
+        console.log(`Message from Group: ${chat.name}`);
+        console.log(`Group ID: ${chat.id}`);
     }
 
     const trackIds = extractSpotifyTrackIds(message.body);
@@ -101,6 +103,8 @@ client.on('message', async message => {
                 console.error(`Error adding track with ID ${trackId}: ${error.message}`);
             }
         }
+    }else{
+        console.log('No Spotify track matched.');
     }
 });
 
