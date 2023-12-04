@@ -1,5 +1,5 @@
 const qrcode = require('qrcode-terminal');
-const fetch = require('node-fetch');
+const fetch = require('cross-fetch');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
 const clientId = process.env.SPOTIFY_CLIENT_ID;
@@ -82,6 +82,14 @@ client.on('ready', () => {
 });
 
 client.on('message', async message => {
+
+    console.log(`Got message: ${message.body}`);
+
+    if (message.isGroupMsg) {
+        console.log(`Message from Group: ${message.chat.name}`);
+        console.log(`Group ID: ${message.chat.id}`);
+    }
+
     const trackIds = extractSpotifyTrackIds(message.body);
     if (trackIds.length > 0) {
         const accessToken = await getAccessToken(clientId, clientSecret);
