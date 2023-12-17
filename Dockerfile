@@ -48,7 +48,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the current directory contents into the container at /usr/src/app
-COPY . .
+COPY package.json .
+COPY ./src .
+COPY ./public ./public
 
 # Install any needed packages specified in package.json
 RUN npm install

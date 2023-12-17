@@ -7,11 +7,11 @@ build:
 
 # Run the container with environment variables from .env file
 run:
-	docker run -d --restart always --env-file .env --name banger-bot-container banger-bot
+	docker run -d --restart always --env-file .env -p 6969:6969 --name banger-bot-container banger-bot
 
 # Run the container interactively with a terminal and environment variables from .env file
 run-interactive:
-	docker run -it --restart always --env-file .env --name banger-bot-container banger-bot
+	docker run -it --restart always --env-file .env -p 6969:6969 --name banger-bot-container banger-bot
 
 # Stop the container
 stop:
