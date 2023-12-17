@@ -8,12 +8,14 @@ const address = process.env.SERVER_ADDRESS || 'http://localhost';
 const port = process.env.SERVER_PORT || 6969;
 const basePath = `${address}:${port}`;
 
-let spotifyAccessToken = null;
+
+let accessToken = null;
+let refreshToken = null;
 let tokenExpirationTime = 0;
 
 async function getAccessToken() {
-    if (spotifyAccessToken && Date.now() < tokenExpirationTime) {
-        return spotifyAccessToken;
+    if (accessToken && Date.now() < tokenExpirationTime) {
+        return accessToken;
     }
 
     let authorizationCode;
@@ -41,41 +43,73 @@ async function getAccessToken() {
     });
 
     const data = await response.json();
-    console.log(data);
-    spotifyAccessToken = data.access_token;
+
+    accessToken = data.access_token;
+    refreshToken = data.refresh_token;
+    tokenExpirationTime = Date.now() + data.expires_in * 1000;
+
+    return data.access_token;
+}
+
+async function refreshAccessToken(){
+    if(!refreshToken){
+        console.error('No refresh token');
+        await getAccessToken();
+    }
+
+    const params = new URLSearchParams();
+    params.append('grant_type', 'refresh_token');
+    params.append('refresh_token', refreshToken);
+
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Basic ' + Buffer.from(clientId + ':' + clientSecret).toString('base64')
+        },
+        body: params.toString(),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+        console.error('Error refreshing Spotify token:', data);
+        throw new Error('Failed to refresh Spotify token');
+    }
+
+    accessToken = data.access_token;
     tokenExpirationTime = Date.now() + data.expires_in * 1000;
     return data.access_token;
 }
 
 
-async function addSongToPlaylist(accessToken, playlistId, trackUri) {
-    console.log('Add song', accessToken, playlistId, trackUri);
+async function addSongToPlaylist(playlistId, trackUri) {
+    
+    const token = await getAccessToken();
     try {
         const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ uris: [trackUri] })
         });
 
-        console.log(response);
-
         if (!response.ok) {
-            throw new Error('Failed to add song to playlist');
+            if (response.status === 401) { // Token expired
+                console.log('Token expired, refreshing token and trying again');
+                await refreshAccessToken();
+                return addSongToPlaylist(playlistId, trackUri);
+            } else {
+                throw new Error('Failed to add song to playlist');
+            }
         }
 
+        console.log('Song added successfully');
         return response.status;
     } catch (error) {
-        if (error.message === 'Failed to add song to playlist') {
-            // Fetch a new token and retry
-            //const newAccessToken = await getAccessToken();
-            //return addSongToPlaylist(newAccessToken, playlistId, trackUri);
-            console.log('Failed to add song');
-        } else {
-            throw error;
-        }
+        console.error(`Error in addSongToPlaylist: ${error.message}`);
+        throw error;
     }
 }
 
