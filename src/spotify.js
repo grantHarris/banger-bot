@@ -83,7 +83,6 @@ async function refreshAccessToken(){
 
 
 async function addSongToPlaylist(playlistId, trackUri) {
-    
     const token = await getAccessToken();
     try {
         const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
@@ -95,13 +94,16 @@ async function addSongToPlaylist(playlistId, trackUri) {
             body: JSON.stringify({ uris: [trackUri] })
         });
 
+        const responseData = await response.json(); // Always parse the response
+
         if (!response.ok) {
             if (response.status === 401) { // Token expired
                 console.log('Token expired, refreshing token and trying again');
                 await refreshAccessToken();
                 return addSongToPlaylist(playlistId, trackUri);
             } else {
-                throw new Error('Failed to add song to playlist');
+                console.error(`Failed to add song to playlist. Status: ${response.status}, Response:`, responseData);
+                throw new Error(`Failed to add song to playlist. Status: ${response.status}`);
             }
         }
 
@@ -112,6 +114,7 @@ async function addSongToPlaylist(playlistId, trackUri) {
         throw error;
     }
 }
+
 
 const extractSpotifyTrackIds = (text) => {
     const trackIdPattern = /open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/g;
@@ -130,7 +133,7 @@ const addTracksToPlaylist = async (trackIds, playlistId) => {
     console.log('access token', accessToken);
     for (const trackId of trackIds) {
         try {
-            await addSongToPlaylist(accessToken, playlistId, `spotify:track:${trackId}`);
+            await addSongToPlaylist(playlistId, `spotify:track:${trackId}`);
             console.log(`Added track with ID ${trackId} to playlist`);
         } catch (error) {
             console.error(`Error adding track with ID ${trackId}: ${error.message}`);
