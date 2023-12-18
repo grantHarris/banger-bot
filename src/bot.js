@@ -1,12 +1,48 @@
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const path = require('path');
 const fs = require('fs');
 
 const { processTracksFromString } = require('./spotify.js');
 
-const qrCodeImagePath = path.join(__dirname, 'public', 'qrCode.png');
-const chatPlaylistMap = JSON.parse(process.env.CHAT_PLAYLIST_MAP || '{}');
+
+const getPlaylistMap = () => {
+    try {
+        const rawChatPlaylistMap = JSON.parse(process.env.CHAT_PLAYLIST_MAP || '{}');
+        return Object.keys(rawChatPlaylistMap).reduce((acc, key) => {
+            acc[key.toLowerCase().trim()] = rawChatPlaylistMap[key];
+            return acc;
+        }, {});
+    } catch (e) {
+        console.error("Error parsing CHAT_PLAYLIST_MAP:", e);
+        return {};
+    }
+};
+
+console.log(getPlaylistMap());
+
+const processMessage = async message => {
+    const contact = await message.getContact();
+    const chatPlaylistMap = getPlaylistMap();
+
+    console.log(`${contact.name}: ${message.body}`);
+
+    const chat = await message.getChat();
+
+    if (chat.isGroup) {
+        console.log(`Message from group: ${chat.name}`);
+        const normalizedChatName = chat.name.toLowerCase().trim();
+
+        // Use the chat name to get the corresponding playlist ID
+        const playlistId = chatPlaylistMap[normalizedChatName];
+
+        if(playlistId) {
+            console.log(`Matched group chat ${chat.name} and evaluating for playlist ID ${playlistId}`);
+            await processTracksFromString(message.body, playlistId);
+        } else {
+            console.log('Chat does not contain playlist.');
+        }
+    }
+};
 
 const client = new Client({
     puppeteer: {
@@ -24,25 +60,8 @@ client.on('ready', () => {
     console.log('Client is ready!');
 });
 
-client.on('message', async message => {
 
-    const contact = await message.getContact();
-    console.log(`${contact.name}: ${message.body}`);
-
-    const chat = await message.getChat();
-    if (chat.isGroup) {
-        console.log(`Message from group: ${chat.name}`);
-
-        // Use the chat name to get the corresponding playlist ID
-        const playlistId = chatPlaylistMap[chat.name];
-
-        if(playlistId) {
-            console.log(`Matched message containing Spotify song from group chat ${chat.name} with playlist ID ${playlistId}`);
-            await processTracksFromString(message.body, playlistId);
-        } else {
-            console.log('Chat not mapped to a playlist.');
-        }
-    }
-});
+client.on('message', processMessage);
+client.on('message_create', processMessage);
 
 client.initialize();
