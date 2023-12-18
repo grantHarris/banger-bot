@@ -61,7 +61,6 @@ client.on('ready', () => {
 });
 
 
-client.on('message', processMessage);
 client.on('message_create', processMessage);
 
 client.initialize();
