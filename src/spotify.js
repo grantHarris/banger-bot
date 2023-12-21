@@ -115,18 +115,34 @@ async function addSongToPlaylist(playlistId, trackUri) {
     }
 }
 
+async function resolveShortenedUrl(shortUrl) {
+    const response = await fetch(shortUrl, { method: 'HEAD', redirect: 'follow' });
+    return response.url;
+}
 
-const extractSpotifyTrackIds = (text) => {
-    const trackIdPattern = /open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/g;
+const extractSpotifyTrackIds = async (text) => {
+    const regularTrackIdPattern = /open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/g;
+    const shortenedTrackUrlPattern = /spotify\.link\/([a-zA-Z0-9]+)/g;
     let match;
     const trackIds = [];
 
-    while ((match = trackIdPattern.exec(text)) !== null) {
+    // Extract regular track IDs
+    while ((match = regularTrackIdPattern.exec(text)) !== null) {
         trackIds.push(match[1]);
+    }
+
+    // Extract and resolve shortened URLs
+    while ((match = shortenedTrackUrlPattern.exec(text)) !== null) {
+        const resolvedUrl = await resolveShortenedUrl(`https://spotify.link/${match[1]}`);
+        const resolvedMatch = regularTrackIdPattern.exec(resolvedUrl);
+        if (resolvedMatch) {
+            trackIds.push(resolvedMatch[1]);
+        }
     }
 
     return trackIds;
 }
+
 
 const addTracksToPlaylist = async (trackIds, playlistId) => {
     const accessToken = await getAccessToken();
