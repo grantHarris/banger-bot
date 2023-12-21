@@ -1,9 +1,12 @@
 const express = require('express');
 const qrcode = require('qrcode');
 const fs = require('fs');
-
+const bodyParser = require('body-parser');
 const querystring = require('querystring');
+
+
 require('dotenv').config();
+const { extractSpotifyTrackIds, addTracksToPlaylist } = require('./spotify.js');
 
 const app = express();
 
@@ -13,6 +16,7 @@ const clientId = process.env.SPOTIFY_CLIENT_ID;
 
 const basePath = `${address}:${port}`;
 
+app.use(bodyParser.text({ type: 'text/plain' }));
 app.use(express.static('public'));
 
 app.get('/', (req, res) => {
@@ -54,6 +58,29 @@ app.get('/callback', (req, res) => {
     }
 });
 
+app.post('/add/:playlistId', async (req, res) => {
+    const playlistId = req.params.playlistId;
+    const chatArchive = req.body;
+
+    console.log('chatArchive', chatArchive);
+
+    try {
+        const trackIds = extractSpotifyTrackIds(chatArchive);
+        if (trackIds.length === 0) {
+            return res.status(400).send('No Spotify links found in the chat archive.');
+        }
+
+        await addTracksToPlaylist(trackIds, playlistId);
+        res.send('Tracks added to playlist successfully.');
+    } catch (error) {
+        console.error('Error processing chat archive:', error);
+        res.status(500).send('Failed to process chat archive.');
+    }
+});
+
+
 app.listen(port, () => {
     console.log(`Server listening at ${basePath}`);
 });
+
+
