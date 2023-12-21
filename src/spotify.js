@@ -12,6 +12,7 @@ const basePath = `${address}:${port}`;
 let accessToken = null;
 let refreshToken = null;
 let tokenExpirationTime = 0;
+let playlistTracksCache = {};
 
 async function getAccessToken() {
     if (accessToken && Date.now() < tokenExpirationTime) {
@@ -81,8 +82,49 @@ async function refreshAccessToken(){
     return data.access_token;
 }
 
+async function getPlaylistTracks(playlistId) {
+    // Check if the playlist is already in the cache
+    if (playlistTracksCache[playlistId]) {
+        console.log(`Using cached tracks for playlist ${playlistId}`);
+        return playlistTracksCache[playlistId];
+    }
+
+    const token = await getAccessToken();
+    let tracks = [];
+    let url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+
+    do {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch playlist tracks: ${response.status}`);
+        }
+
+        const data = await response.json();
+        tracks = tracks.concat(data.items.map(item => item.track.uri));
+        url = data.next; // Pagination support
+    } while (url);
+
+    // Update the cache
+    playlistTracksCache[playlistId] = tracks;
+    return tracks;
+}
+
 
 async function addSongToPlaylist(playlistId, trackUri) {
+
+    const existingTracks = await getPlaylistTracks(playlistId);
+
+    if (existingTracks.includes(trackUri)) {
+        console.log(`Track ${trackUri} is already in the playlist.`);
+        return; // Skip adding if already present
+    }
+
     const token = await getAccessToken();
     try {
         const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
@@ -107,7 +149,8 @@ async function addSongToPlaylist(playlistId, trackUri) {
             }
         }
 
-        console.log('Song added successfully');
+        playlistTracksCache[playlistId] = [...existingTracks, trackUri];
+        console.log('Song added successfully and cache updated');
         return response.status;
     } catch (error) {
         console.error(`Error in addSongToPlaylist: ${error.message}`);
@@ -145,6 +188,11 @@ const extractSpotifyTrackIds = async (text) => {
 
 
 const addTracksToPlaylist = async (trackIds, playlistId) => {
+    if (!Array.isArray(trackIds)) {
+        console.error(`Invalid trackIds: expected an array, but got ${typeof trackIds}`, trackIds);
+        return;
+    }
+
     const accessToken = await getAccessToken();
     console.log('access token', accessToken);
     for (const trackId of trackIds) {
@@ -156,6 +204,7 @@ const addTracksToPlaylist = async (trackIds, playlistId) => {
         }
     }
 }
+
 
 const processTracksFromString = async (str, playlistId)  => {
     const trackIds = extractSpotifyTrackIds(str);

@@ -65,7 +65,7 @@ app.post('/add/:playlistId', async (req, res) => {
     console.log('chatArchive', chatArchive);
 
     try {
-        const trackIds = extractSpotifyTrackIds(chatArchive);
+        const trackIds = await extractSpotifyTrackIds(chatArchive);
         if (trackIds.length === 0) {
             return res.status(400).send('No Spotify links found in the chat archive.');
         }
